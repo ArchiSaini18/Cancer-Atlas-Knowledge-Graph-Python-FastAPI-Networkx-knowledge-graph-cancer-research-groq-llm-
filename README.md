@@ -69,7 +69,7 @@ Cross-cancer `SHARES_DISEASE` edges are weighted **2.0** (vs 1.0 for same-cancer
 * Add a **citation graph overlay** via the CrossRef API
 * Temporal (year-over-year) edges to track research trends
 
-📖 About
+# 📖 About
 
 The 3CA Knowledge Graph connects 124+ single-cell cancer studies from the Weizmann Institute's Curated Cancer Cell Atlas into a single explorable graph — surfacing cross-cancer relationships between diseases, sequencing technologies, and authors that are invisible when datasets are viewed in isolation. It combines a Python/NetworkX graph pipeline, a FastAPI backend, a D3.js visual explorer, and an LLM-powered natural language interface.
 
