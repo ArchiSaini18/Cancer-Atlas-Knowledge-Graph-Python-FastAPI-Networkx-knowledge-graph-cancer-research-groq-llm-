@@ -93,7 +93,7 @@ uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 Then open `http://localhost:8000` for the graph explorer or `http://localhost:8000/docs` for the API docs.
 
-📦 Project Structure
+#📦 Project Structure
 
 ```
 3ca-knowledge-graph/
@@ -113,7 +113,7 @@ Then open `http://localhost:8000` for the graph explorer or `http://localhost:80
     └── graph.graphml
 ```
 
-Languages
+# Languages
 
 * Python
 * HTML / JavaScript (D3.js)
