@@ -123,6 +123,4 @@ Languages
 * Python
 * HTML / JavaScript (D3.js)
 
-License
 
-MIT — See LICENSE for details. Data sourced from the Weizmann Institute of Science 3CA project; please cite the original studies when using this data.
