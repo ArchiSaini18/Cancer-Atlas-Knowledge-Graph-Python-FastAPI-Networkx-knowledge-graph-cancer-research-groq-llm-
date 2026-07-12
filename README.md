@@ -1,13 +1,8 @@
-'''🧬 3CA Knowledge Graph — Cancer Dataset Explorer '''
+# 🧬 3CA Knowledge Graph — Cancer Dataset Explorer 
 
 This project builds a unified **knowledge graph** for the [Weizmann Institute 3CA (Curated Cancer Cell Atlas)](https://www.weizmann.ac.il/sites/3CA/), connecting **124+ single-cell RNA-seq (scRNA-seq) cancer datasets** through shared diseases, technologies, authors, and cancer types — exposed via a REST API, an interactive D3.js graph explorer, and an AI natural language chat interface.
 
-🚀 Live Application
-
-👉 API Docs: `http://localhost:8000/docs` (after running locally — see Quick Start below)
-👉 Graph Explorer UI: `http://localhost:8000`
-
-📌 Project Overview
+# 📌 Project Overview
 
 The 3CA collection hosts 124 studies across 15 cancer types and 5.6M+ cells — but each dataset lives in isolation. You can't easily answer questions like:
 
@@ -32,7 +27,7 @@ This system solves that by:
 * **Cells:** 5.6M+
 * **Graph Size:** ~287 nodes, ~1,842 edges (Study, CancerType, Disease, Technology, Author)
 
-🛠️ Technologies Used
+# 🛠️ Technologies Used
 
 * **Python 3.10+**
 * **NetworkX** – Knowledge graph construction (MultiDiGraph)
@@ -41,7 +36,7 @@ This system solves that by:
 * **D3.js** – Interactive force-directed graph frontend
 * **Groq (Llama-3.3-70B)** – Natural language Q&A over the graph
 
-🕸️ Graph Design
+# 🕸️ Graph Design
 
 **Node Types:** `Study` · `CancerType` · `Disease` · `Technology` · `Author`
 
@@ -49,7 +44,7 @@ This system solves that by:
 
 Cross-cancer `SHARES_DISEASE` edges are weighted **2.0** (vs 1.0 for same-cancer edges) to surface the biologically interesting cases where *different* cancer types study the *same* disease subtype.
 
-🖥️ Application Features
+# 🖥️ Application Features
 
 ✔ Interactive force-directed graph with filters by cancer type & technology
 ✔ Click any node → detail panel with study metadata and download links
@@ -58,14 +53,14 @@ Cross-cancer `SHARES_DISEASE` edges are weighted **2.0** (vs 1.0 for same-cancer
 ✔ BFS neighborhood expansion for exploring connected studies
 ✔ GraphML export for Gephi / Cytoscape
 
-📈 Visualization
+# 📈 Visualization
 
 * Force-directed graph layout (D3.js)
 * Node coloring by type (Study / CancerType / Disease / Technology / Author)
 * Degree centrality-based node sizing to highlight hub studies
 * GraphML export for publication-quality layouts in Gephi/Cytoscape
 
-🔮 Future Improvements
+# 🔮 Future Improvements
 
 * Replace NetworkX with **Neo4j** for Cypher queries at scale
 * Extend to a **gene-level graph** with meta-programs and marker genes
@@ -78,7 +73,7 @@ Cross-cancer `SHARES_DISEASE` edges are weighted **2.0** (vs 1.0 for same-cancer
 
 The 3CA Knowledge Graph connects 124+ single-cell cancer studies from the Weizmann Institute's Curated Cancer Cell Atlas into a single explorable graph — surfacing cross-cancer relationships between diseases, sequencing technologies, and authors that are invisible when datasets are viewed in isolation. It combines a Python/NetworkX graph pipeline, a FastAPI backend, a D3.js visual explorer, and an LLM-powered natural language interface.
 
-⚙️ Quick Start
+# ⚙️ Quick Start
 
 ```bash
 git clone <your-repo>
