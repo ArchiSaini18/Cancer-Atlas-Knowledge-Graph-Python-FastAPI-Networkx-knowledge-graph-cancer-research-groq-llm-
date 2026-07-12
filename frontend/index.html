@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>3CA Knowledge Graph — Curated Cancer Cell Atlas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  :root {
+    --bg: #07090f;
+    --surface: #0d1117;
+    --surface2: #161b22;
+    --border: #21262d;
+    --text: #e6edf3;
+    --text-dim: #7d8590;
+    --accent: #58a6ff;
+    --accent2: #bc8cff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --cyan: #39d353;
+
+    /* Node colors by type */
+    --col-study: #58a6ff;
+    --col-cancer: #ff7b72;
+    --col-disease: #ffa657;
+    --col-tech: #3fb950;
+    --col-author: #bc8cff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* Layout */
+  #app { display: flex; height: 100vh; }
+  #sidebar {
+    width: 340px;
+    min-width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+  }
+  #main { flex: 1; display: flex; flex-direction: column; position: relative; }
+
+  /* Sidebar header */
+  .sidebar-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: bold; color: white;
+  }
+  .logo h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .logo p { font-size: 11px; color: var(--text-dim); }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex; gap: 0;
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+    margin-top: 10px;
+  }
+  .stat-item {
+    flex: 1; padding: 8px 10px; text-align: center;
+    border-right: 1px solid var(--border);
+  }
+  .stat-item:last-child { border-right: none; }
+  .stat-num { font-size: 16px; font-weight: 700; color: var(--accent); font-family: monospace; }
+  .stat-label { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Sidebar sections */
+  .sidebar-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+
+  .section-label {
+    font-size: 10px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+  }
+
+  /* Search */
+  .search-box {
+    position: relative;
+  }
+  .search-box input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px 8px 32px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-box input:focus { border-color: var(--accent); }
+  .search-box::before {
+    content: "⌕";
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--text-dim); font-size: 16px; pointer-events: none;
+  }
+
+  /* AI Query */
+  .ai-section textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text);
+    font-size: 12px;
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+    outline: none;
+  }
+  .ai-section textarea:focus { border-color: var(--accent2); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 6px; border: none;
+    font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #0d1117; }
+  .btn-primary:hover { background: #79c0ff; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); }
+  .btn-ai { background: linear-gradient(135deg, var(--accent2), var(--accent)); color: white; width: 100%; justify-content: center; margin-top: 8px; }
+  .btn-ai:hover { opacity: 0.9; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* AI answer box */
+  #ai-answer {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text);
+    display: none;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  #ai-answer.visible { display: block; }
+  #ai-answer strong { color: var(--accent); }
+  #ai-answer code {
+    background: var(--bg); border-radius: 3px;
+    padding: 1px 4px; font-size: 11px;
+  }
+
+  /* Filter pills */
+  .filter-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .pill {
+    padding: 4px 10px; border-radius: 20px; font-size: 11px;
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text-dim); cursor: pointer; transition: all 0.15s;
+  }
+  .pill:hover { border-color: var(--accent); color: var(--text); }
+  .pill.active { background: var(--accent); border-color: var(--accent); color: #0d1117; font-weight: 600; }
+
+  /* Legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-dim); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* Detail panel */
+  #detail-panel {
+    position: absolute; right: 0; top: 0; bottom: 0;
+    width: 320px; background: var(--surface);
+    border-left: 1px solid var(--border);
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    z-index: 20;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  #detail-panel.open { transform: translateX(0); }
+  .panel-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 10px;
+  }
+  .panel-header h2 { font-size: 13px; font-weight: 600; line-height: 1.4; }
+  .panel-close {
+    background: none; border: none; color: var(--text-dim);
+    font-size: 18px; cursor: pointer; flex-shrink: 0; padding: 0;
+  }
+  .panel-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .meta-row { display: flex; flex-direction: column; gap: 2px; }
+  .meta-key { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+  .meta-val { font-size: 13px; }
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;
+  }
+  .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-orange { background: rgba(210,153,34,0.15); color: var(--orange); }
+  .badge-purple { background: rgba(188,140,255,0.15); color: var(--accent2); }
+  .capability-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .cap-badge {
+    padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .cap-yes { background: rgba(63,185,80,0.15); color: var(--green); }
+  .cap-no { background: rgba(125,133,144,0.1); color: var(--text-dim); }
+  .neighbor-list { display: flex; flex-direction: column; gap: 5px; }
+  .neighbor-item {
+    padding: 7px 10px; border-radius: 6px; background: var(--surface2);
+    border: 1px solid var(--border); font-size: 11px; cursor: pointer;
+    transition: border-color 0.15s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .neighbor-item:hover { border-color: var(--accent); }
+  .neighbor-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .link-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    color: var(--accent); text-decoration: none; font-size: 12px;
+  }
+  .link-btn:hover { text-decoration: underline; }
+
+  /* Graph canvas */
+  #graph-svg { width: 100%; height: 100%; }
+  .graph-area { flex: 1; position: relative; }
+
+  /* Tooltip */
+  .tooltip {
+    position: absolute; pointer-events: none; z-index: 100;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px; font-size: 12px;
+    max-width: 220px; display: none; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .tooltip.visible { display: block; }
+  .tooltip-title { font-weight: 600; margin-bottom: 4px; }
+  .tooltip-type { font-size: 10px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; }
+
+  /* Controls bar */
+  .controls-bar {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px; z-index: 10;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 8px 12px;
+  }
+  .controls-bar select {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 4px 8px; font-size: 12px;
+  }
+
+  /* Loading state */
+  #loading {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; flex-direction: column; gap: 12px;
+    background: var(--bg); z-index: 50;
+  }
+  .spinner {
+    width: 36px; height: 36px; border: 3px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Search results dropdown */
+  #search-results {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; z-index: 100; max-height: 220px; overflow-y: auto;
+    display: none; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  #search-results.visible { display: block; }
+  .search-result-item {
+    padding: 8px 12px; cursor: pointer; font-size: 12px;
+    border-bottom: 1px solid var(--border); transition: background 0.1s;
+  }
+  .search-result-item:hover { background: var(--surface); }
+  .search-result-item:last-child { border-bottom: none; }
+  .sr-title { font-weight: 500; }
+  .sr-meta { color: var(--text-dim); font-size: 11px; margin-top: 1px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">3C</div>
+        <div>
+          <h1>3CA Knowledge Graph</h1>
+          <p>Curated Cancer Cell Atlas · Weizmann Institute</p>
+        </div>
+      </div>
+      <div class="stats-bar">
+        <div class="stat-item">
+          <div class="stat-num" id="stat-studies">—</div>
+          <div class="stat-label">Studies</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num" id="stat-cells">—</div>
+          <div class="stat-label">Cells</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num" id="stat-edges">—</div>
+          <div class="stat-label">Links</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-body">
+
+      <!-- Search -->
+      <div>
+        <div class="section-label">Search Datasets</div>
+        <div class="search-box" style="position:relative">
+          <input type="text" id="search-input" placeholder="Author, disease, cancer type…" autocomplete="off" />
+          <div id="search-results"></div>
+        </div>
+      </div>
+
+      <!-- Cancer type filters -->
+      <div>
+        <div class="section-label">Filter by Cancer Type</div>
+        <div class="filter-pills" id="cancer-pills">
+          <div class="pill active" data-filter="all">All</div>
+        </div>
+      </div>
+
+      <!-- Technology filters -->
+      <div>
+        <div class="section-label">Technology</div>
+        <div class="filter-pills" id="tech-pills">
+          <div class="pill active" data-tech="all">All</div>
+        </div>
+      </div>
+
+      <!-- AI Query -->
+      <div class="ai-section">
+        <div class="section-label">Ask AI About the Graph</div>
+        <textarea id="ai-input" placeholder="e.g. Which lung cancer studies use SmartSeq2 and have CNAs?"></textarea>
+        <button class="btn btn-ai" id="ai-btn" onclick="askAI()">✦ Ask Groq AI</button>
+        <div id="ai-answer"></div>
+      </div>
+
+      <!-- Legend -->
+      <div>
+        <div class="section-label">Node Types</div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--col-study)"></div> Study</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--col-cancer)"></div> Cancer Type</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--col-disease)"></div> Disease</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--col-tech)"></div> Technology</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--col-author)"></div> Author</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Main graph area -->
+  <div id="main">
+    <div id="loading">
+      <div class="spinner"></div>
+      <div style="font-size:14px;color:var(--text-dim)">Loading knowledge graph…</div>
+    </div>
+    <div class="graph-area">
+      <svg id="graph-svg"></svg>
+    </div>
+    <div class="controls-bar">
+      <label style="font-size:12px;color:var(--text-dim)">Relation:</label>
+      <select id="edge-filter" onchange="filterEdges()">
+        <option value="all">All edges</option>
+        <option value="BELONGS_TO">Belongs To</option>
+        <option value="STUDIES_DISEASE">Studies Disease</option>
+        <option value="SHARES_DISEASE">Shares Disease</option>
+        <option value="USES_TECHNOLOGY">Uses Technology</option>
+        <option value="AUTHORED_BY">Authored By</option>
+      </select>
+      <button class="btn btn-secondary" onclick="resetZoom()">⟳ Reset</button>
+      <button class="btn btn-secondary" onclick="toggleLabels()">⊟ Labels</button>
+    </div>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+
+  <!-- Detail panel -->
+  <div id="detail-panel">
+    <div class="panel-header">
+      <h2 id="panel-title">Node Detail</h2>
+      <button class="panel-close" onclick="closePanel()">✕</button>
+    </div>
+    <div class="panel-body" id="panel-body"></div>
+  </div>
+</div>
+
+<script>
+const API = '';  // same origin; change to http://localhost:8000 for dev
+const NODE_COLORS = {
+  Study: '#58a6ff',
+  CancerType: '#ff7b72',
+  Disease: '#ffa657',
+  Technology: '#3fb950',
+  Author: '#bc8cff',
+};
+const NODE_RADII = {
+  Study: 7,
+  CancerType: 14,
+  Disease: 10,
+  Technology: 10,
+  Author: 8,
+};
+
+let allNodes = [], allEdges = [], simulation, svg, g, link, node, label;
+let showLabels = true;
+let activeFilter = 'all';
+let activeTech = 'all';
+let graphData = null;
+
+// ── Fetch & Boot ──────────────────────────────────────────────────────────────
+async function loadGraph() {
+  try {
+    const [graphRes, statsRes] = await Promise.all([
+      fetch(`${API}/api/graph?limit_nodes=400`),
+      fetch(`${API}/api/stats`),
+    ]);
+    
+    if (!graphRes.ok) throw new Error('Failed to load graph');
+    graphData = await graphRes.json();
+    const stats = await statsRes.json();
+
+    // Update stats bar
+    document.getElementById('stat-studies').textContent = stats.total_studies || graphData.stats?.total_studies || '—';
+    document.getElementById('stat-cells').textContent = fmtNum(stats.total_cells || 0);
+    document.getElementById('stat-edges').textContent = graphData.stats?.total_edges || '—';
+
+    allNodes = graphData.nodes;
+    allEdges = graphData.edges;
+
+    buildFilters(stats);
+    buildGraph(allNodes, allEdges);
+    document.getElementById('loading').style.display = 'none';
+  } catch (err) {
+    console.error(err);
+    document.getElementById('loading').innerHTML = `
+      <div style="color:var(--red);text-align:center;padding:20px">
+        <div style="font-size:24px;margin-bottom:8px">⚠</div>
+        <div>Failed to connect to API server</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:6px">
+          Run: <code>uvicorn backend.main:app --port 8000</code>
+        </div>
+      </div>`;
+  }
+}
+
+function fmtNum(n) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(0) + 'K';
+  return n;
+}
+
+// ── Filter pills ─────────────────────────────────────────────────────────────
+function buildFilters(stats) {
+  const cancerPills = document.getElementById('cancer-pills');
+  const techPills = document.getElementById('tech-pills');
+
+  Object.keys(stats.cancer_types || {}).sort().forEach(ct => {
+    const pill = document.createElement('div');
+    pill.className = 'pill';
+    pill.dataset.filter = ct;
+    pill.textContent = ct;
+    pill.onclick = () => setCancerFilter(ct, pill);
+    cancerPills.appendChild(pill);
+  });
+
+  Object.keys(stats.technologies || {}).sort().forEach(tech => {
+    const pill = document.createElement('div');
+    pill.className = 'pill';
+    pill.dataset.tech = tech;
+    pill.textContent = tech;
+    pill.onclick = () => setTechFilter(tech, pill);
+    techPills.appendChild(pill);
+  });
+}
+
+function setCancerFilter(filter, el) {
+  activeFilter = filter;
+  document.querySelectorAll('#cancer-pills .pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  applyFilters();
+}
+
+function setTechFilter(tech, el) {
+  activeTech = tech;
+  document.querySelectorAll('#tech-pills .pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  applyFilters();
+}
+
+function applyFilters() {
+  let visibleNodes = allNodes;
+
+  if (activeFilter !== 'all') {
+    const studyIds = new Set(
+      allNodes.filter(n => n.type === 'Study' && n.cancer_type === activeFilter).map(n => n.id)
+    );
+    const ctId = `cancer_${activeFilter.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+    visibleNodes = allNodes.filter(n =>
+      studyIds.has(n.id) || n.id === ctId ||
+      (n.type !== 'Study' && allEdges.some(e =>
+        (e.source === n.id || e.target === n.id) &&
+        (studyIds.has(e.source) || studyIds.has(e.target))
+      ))
+    );
+  }
+
+  if (activeTech !== 'all') {
+    const techStudyIds = new Set(
+      allNodes.filter(n => n.type === 'Study' && n.technology === activeTech).map(n => n.id)
+    );
+    visibleNodes = visibleNodes.filter(n =>
+      techStudyIds.has(n.id) || n.type !== 'Study' ||
+      n.id.startsWith(`tech_${activeTech.toLowerCase()}`)
+    );
+  }
+
+  const visIds = new Set(visibleNodes.map(n => n.id));
+  const visEdges = allEdges.filter(e => visIds.has(e.source?.id || e.source) && visIds.has(e.target?.id || e.target));
+
+  updateGraph(visibleNodes, visEdges);
+}
+
+// ── D3 Force Graph ────────────────────────────────────────────────────────────
+function buildGraph(nodes, edges) {
+  const svgEl = document.getElementById('graph-svg');
+  const W = svgEl.clientWidth, H = svgEl.clientHeight;
+
+  svg = d3.select('#graph-svg');
+  svg.selectAll('*').remove();
+
+  const defs = svg.append('defs');
+  // Arrow marker
+  defs.append('marker')
+    .attr('id', 'arrow')
+    .attr('viewBox', '0 -4 8 8')
+    .attr('refX', 18).attr('refY', 0)
+    .attr('markerWidth', 6).attr('markerHeight', 6)
+    .attr('orient', 'auto')
+    .append('path')
+    .attr('d', 'M0,-4L8,0L0,4')
+    .attr('fill', '#30363d');
+
+  g = svg.append('g');
+
+  // Zoom
+  const zoom = d3.zoom()
+    .scaleExtent([0.1, 5])
+    .on('zoom', e => g.attr('transform', e.transform));
+  svg.call(zoom);
+
+  // Build node map for edges
+  const nodeById = Object.fromEntries(nodes.map(n => [n.id, n]));
+
+  // Resolve edge source/target to node objects
+  const resolvedEdges = edges
+    .map(e => ({
+      ...e,
+      source: typeof e.source === 'string' ? nodeById[e.source] : e.source,
+      target: typeof e.target === 'string' ? nodeById[e.target] : e.target,
+    }))
+    .filter(e => e.source && e.target);
+
+  simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(resolvedEdges).id(d => d.id).distance(d => {
+      if (d.relation === 'BELONGS_TO') return 80;
+      if (d.relation === 'SHARES_DISEASE') return 60;
+      return 100;
+    }).strength(0.3))
+    .force('charge', d3.forceManyBody().strength(d => d.type === 'Study' ? -120 : -200))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('collision', d3.forceCollide().radius(d => NODE_RADII[d.type] + 4));
+
+  link = g.append('g')
+    .selectAll('line')
+    .data(resolvedEdges)
+    .join('line')
+    .attr('stroke', d => edgeColor(d.relation))
+    .attr('stroke-width', d => d.cross_cancer ? 2 : 1)
+    .attr('stroke-opacity', 0.5)
+    .attr('marker-end', 'url(#arrow)');
+
+  node = g.append('g')
+    .selectAll('circle')
+    .data(nodes)
+    .join('circle')
+    .attr('r', d => NODE_RADII[d.type] || 7)
+    .attr('fill', d => NODE_COLORS[d.type] || '#888')
+    .attr('stroke', '#0d1117')
+    .attr('stroke-width', 1.5)
+    .style('cursor', 'pointer')
+    .on('mouseover', onHover)
+    .on('mouseout', onHoverOut)
+    .on('click', onNodeClick)
+    .call(d3.drag()
+      .on('start', (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end', (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+  label = g.append('g')
+    .selectAll('text')
+    .data(nodes.filter(n => n.type !== 'Study'))
+    .join('text')
+    .attr('font-size', d => d.type === 'CancerType' ? 11 : 9)
+    .attr('fill', d => NODE_COLORS[d.type])
+    .attr('dy', d => -(NODE_RADII[d.type] || 7) - 3)
+    .attr('text-anchor', 'middle')
+    .attr('pointer-events', 'none')
+    .text(d => d.label?.slice(0, 20));
+
+  simulation.on('tick', () => {
+    link
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    node.attr('cx', d => d.x).attr('cy', d => d.y);
+    label.attr('x', d => d.x).attr('y', d => d.y);
+  });
+}
+
+function updateGraph(nodes, edges) {
+  // Rebuild graph with new data
+  buildGraph(nodes, edges);
+}
+
+function edgeColor(relation) {
+  const colors = {
+    BELONGS_TO: '#ff7b72',
+    STUDIES_DISEASE: '#ffa657',
+    SHARES_DISEASE: '#58a6ff',
+    USES_TECHNOLOGY: '#3fb950',
+    AUTHORED_BY: '#bc8cff',
+    SHARES_TECHNOLOGY: '#3fb950',
+  };
+  return colors[relation] || '#30363d';
+}
+
+// ── Tooltip ───────────────────────────────────────────────────────────────────
+function onHover(event, d) {
+  const t = document.getElementById('tooltip');
+  let html = `<div class="tooltip-type">${d.type}</div><div class="tooltip-title">${d.label || d.id}</div>`;
+  if (d.type === 'Study') {
+    html += `<div style="color:var(--text-dim);margin-top:4px;font-size:11px">
+      ${d.cancer_type} · ${d.disease_subtype || '—'}<br>
+      ${d.technology || '—'} · ${(d.num_cells||0).toLocaleString()} cells
+    </div>`;
+  }
+  t.innerHTML = html;
+  t.className = 'tooltip visible';
+  t.style.left = (event.offsetX + 12) + 'px';
+  t.style.top = (event.offsetY - 10) + 'px';
+}
+
+function onHoverOut() {
+  document.getElementById('tooltip').className = 'tooltip';
+}
+
+// ── Node click → detail panel ─────────────────────────────────────────────────
+async function onNodeClick(event, d) {
+  event.stopPropagation();
+  document.getElementById('panel-title').textContent = d.label || d.id;
+  document.getElementById('detail-panel').classList.add('open');
+  const body = document.getElementById('panel-body');
+  body.innerHTML = '<div style="color:var(--text-dim);font-size:12px">Loading…</div>';
+
+  if (d.type === 'Study') {
+    const studyId = d.id.replace('study_', '');
+    try {
+      const res = await fetch(`${API}/api/studies/${studyId}`);
+      const data = await res.json();
+      renderStudyPanel(data);
+    } catch {
+      body.innerHTML = renderBasicPanel(d);
+    }
+  } else {
+    body.innerHTML = renderBasicPanel(d);
+  }
+
+  // Highlight node
+  node.attr('stroke', n => n.id === d.id ? '#fff' : '#0d1117')
+      .attr('stroke-width', n => n.id === d.id ? 2.5 : 1.5);
+}
+
+function renderStudyPanel(data) {
+  const s = data.study;
+  const neighbors = data.neighbors || [];
+  const body = document.getElementById('panel-body');
+
+  const caps = [
+    ['Meta-programs', s.has_meta_programs],
+    ['CNAs', s.has_cna],
+    ['UMAP', s.has_umap],
+    ['Cell Cycle', s.has_cell_cycle],
+  ];
+
+  body.innerHTML = `
+    <div class="meta-row">
+      <div class="meta-key">Cancer Type</div>
+      <div class="meta-val"><span class="badge badge-blue">${s.cancer_type}</span></div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-key">Disease Subtype</div>
+      <div class="meta-val">${s.disease_subtype || '—'}</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-key">Technology</div>
+      <div class="meta-val"><span class="badge badge-green">${s.technology || '—'}</span></div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-key">Year</div>
+      <div class="meta-val">${s.year || '—'}</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-key">Samples · Cells</div>
+      <div class="meta-val">${s.num_samples} samples · ${(s.num_cells||0).toLocaleString()} cells</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-key">Data Capabilities</div>
+      <div class="capability-grid">
+        ${caps.map(([n,v]) => `<span class="cap-badge ${v?'cap-yes':'cap-no'}">${n}</span>`).join('')}
+      </div>
+    </div>
+    ${s.paper_url ? `<div><a href="${s.paper_url}" target="_blank" class="link-btn">↗ View Paper</a></div>` : ''}
+    ${s.data_url ? `<div><a href="${s.data_url}" target="_blank" class="link-btn">↓ Download Data</a></div>` : ''}
+    ${neighbors.length ? `
+    <div>
+      <div class="section-label" style="margin-bottom:6px">Connected Nodes (${neighbors.length})</div>
+      <div class="neighbor-list">
+        ${neighbors.slice(0, 10).map(n => `
+          <div class="neighbor-item" onclick="focusNode('${n.id}')">
+            <div class="neighbor-dot" style="background:${NODE_COLORS[n.type]||'#888'}"></div>
+            <div>
+              <div style="font-weight:500">${(n.label||n.id).slice(0,30)}</div>
+              <div style="color:var(--text-dim);font-size:10px">${n.type}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>` : ''}
+  `;
+}
+
+function renderBasicPanel(d) {
+  const attrs = Object.entries(d)
+    .filter(([k]) => !['id', 'label', 'type'].includes(k))
+    .slice(0, 8);
+  
+  return `
+    <div class="meta-row">
+      <div class="meta-key">Type</div>
+      <div class="meta-val"><span class="badge badge-purple">${d.type}</span></div>
+    </div>
+    ${attrs.map(([k, v]) => `
+      <div class="meta-row">
+        <div class="meta-key">${k.replace(/_/g,' ')}</div>
+        <div class="meta-val">${v !== null && v !== undefined ? String(v).slice(0,80) : '—'}</div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function focusNode(nodeId) {
+  const d = allNodes.find(n => n.id === nodeId);
+  if (d) onNodeClick({ stopPropagation: ()=>{} }, d);
+}
+
+function closePanel() {
+  document.getElementById('detail-panel').classList.remove('open');
+  node?.attr('stroke', '#0d1117').attr('stroke-width', 1.5);
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+function resetZoom() {
+  const svgEl = document.getElementById('graph-svg');
+  d3.select(svgEl).transition().duration(500)
+    .call(d3.zoom().transform, d3.zoomIdentity);
+}
+
+function toggleLabels() {
+  showLabels = !showLabels;
+  label?.style('display', showLabels ? null : 'none');
+}
+
+function filterEdges() {
+  const val = document.getElementById('edge-filter').value;
+  link?.attr('display', d => val === 'all' || d.relation === val ? null : 'none');
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+let searchTimeout;
+document.getElementById('search-input').addEventListener('input', function() {
+  clearTimeout(searchTimeout);
+  const q = this.value.trim();
+  if (q.length < 2) {
+    document.getElementById('search-results').className = 'search-results';
+    return;
+  }
+  searchTimeout = setTimeout(() => doSearch(q), 300);
+});
+
+document.addEventListener('click', () => {
+  document.getElementById('search-results').className = 'search-results';
+});
+
+async function doSearch(q) {
+  try {
+    const res = await fetch(`${API}/api/search`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query: q, max_results: 8}),
+    });
+    const data = await res.json();
+    const el = document.getElementById('search-results');
+    
+    if (!data.results?.length) {
+      el.innerHTML = '<div class="search-result-item" style="color:var(--text-dim)">No results</div>';
+    } else {
+      el.innerHTML = data.results.map(s => `
+        <div class="search-result-item" onclick="onSearchSelect('${s.id}')">
+          <div class="sr-title">${s.label || s.id}</div>
+          <div class="sr-meta">${s.cancer_type} · ${s.disease_subtype||''} · ${s.technology||''}</div>
+        </div>
+      `).join('');
+    }
+    el.className = 'search-results visible';
+    el.style.display = 'block';
+    el.style.cssText += ';position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;z-index:100;max-height:220px;overflow-y:auto;display:block;box-shadow:0 8px 24px rgba(0,0,0,0.4)';
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function onSearchSelect(nodeId) {
+  document.getElementById('search-results').style.display = 'none';
+  const d = allNodes.find(n => n.id === nodeId || n.id === `study_${nodeId}`);
+  if (d) {
+    onNodeClick({ stopPropagation: ()=>{} }, d);
+    // Pan to node
+    if (d.x && d.y) {
+      const svgEl = document.getElementById('graph-svg');
+      const W = svgEl.clientWidth, H = svgEl.clientHeight;
+      d3.select(svgEl).transition().duration(600)
+        .call(d3.zoom().transform,
+          d3.zoomIdentity.translate(W/2 - d.x, H/2 - d.y).scale(1.5));
+    }
+  }
+}
+
+// ── AI Query ──────────────────────────────────────────────────────────────────
+async function askAI() {
+  const q = document.getElementById('ai-input').value.trim();
+  if (!q) return;
+
+  const btn = document.getElementById('ai-btn');
+  const answerEl = document.getElementById('ai-answer');
+  btn.disabled = true;
+  btn.textContent = '✦ Thinking…';
+  answerEl.className = 'visible';
+  answerEl.textContent = 'Querying Groq AI…';
+
+  try {
+    const res = await fetch(`${API}/api/ai/query`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question: q}),
+    });
+    const data = await res.json();
+
+    if (data.answer) {
+      // Minimal markdown rendering
+      answerEl.innerHTML = data.answer
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`(.+?)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
+    } else {
+      answerEl.textContent = data.detail || 'No answer received.';
+    }
+  } catch (err) {
+    answerEl.textContent = `Error: ${err.message}. Make sure the API server is running.`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✦ Ask Groq AI';
+}
+
+// Allow Enter key in AI input
+document.getElementById('ai-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.ctrlKey) askAI();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadGraph();
+</script>
+</body>
+</html>
